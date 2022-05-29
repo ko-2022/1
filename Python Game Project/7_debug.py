@@ -1,0 +1,280 @@
+####################################################################
+### Hyunsung KO, student of Sorbonne University in Paris, France ###
+####################################################################
+
+######## Inspired by Super Pang (1990) by Capcom Co., Ltd. ########
+
+import os
+import pygame
+
+#######################################################################################
+# Initiation
+pygame.init()
+
+# Display size setting
+screen_width = 640
+screen_height = 480
+screen = pygame.display.set_mode((screen_width, screen_height))
+
+# Game title setting
+pygame.display.set_caption("The Balloon Game")
+
+# FPS
+clock = pygame.time.Clock()
+#######################################################################################
+
+# 1. Initiation of user game (Background, game images, coordinates, speed, font, etc.)
+current_path = os.path.dirname(__file__)
+image_path = os.path.join(current_path, "images")
+
+# Background
+background = pygame.image.load(os.path.join(image_path, "background.png"))
+
+# Stage
+stage = pygame.image.load(os.path.join(image_path, "stage.png"))
+stage_size = stage.get_rect().size
+stage_height = stage_size[1] # To put the character on the height of the stage
+
+# Character
+character = pygame.image.load(os.path.join(image_path, "character.png"))
+character_size = character.get_rect().size
+character_width = character_size[0]
+character_height = character_size[1]
+character_x_pos = (screen_width - character_width) / 2
+character_y_pos = screen_height - character_height - stage_height
+
+# Character moving direction
+character_to_x = 0
+character_to_x_LEFT = 0
+character_to_x_RIGHT = 0
+
+# Character moving speed
+character_speed = 5
+
+# Weapon
+weapon = pygame.image.load(os.path.join(image_path, "weapon.png"))
+weapon_size = weapon.get_rect().size
+weapon_width = character_size[0]
+
+weapons = []
+
+# Weapon speed
+weapon_speed = 12
+
+# Ball creation
+ball_images = [
+    pygame.image.load(os.path.join(image_path, "balloon1.png")),
+    pygame.image.load(os.path.join(image_path, "balloon2.png")),
+    pygame.image.load(os.path.join(image_path, "balloon3.png")),
+    pygame.image.load(os.path.join(image_path, "balloon4.png"))]
+
+# Ball speed
+ball_speed_y = [-18, -15, -12, -9]
+
+# Balls
+balls = []
+
+balls.append({
+    "pos_x" : 50,
+    "pos_y" : 50,
+    "img_idx" : 0,
+    "to_x" : 3, # if it's -3, then to the left, and if it's 3, then to the right
+    "to_y" : -5,
+    "init_spd_y" : ball_speed_y[0]})
+
+# Weapons and balls to remove
+weapon_to_remove = -1
+ball_to_remove = -1
+
+# Font definition
+game_font = pygame.font.Font(None, 44)
+total_time = 30
+start_ticks = pygame.time.get_ticks()
+
+# Game result message
+game_result = "Game Over"
+
+running = True
+while running:
+    dt = clock.tick(30)
+
+    # 2. Event processing (Keyboard, mouse, etc.)
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+        
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_LEFT: # the character to left
+                character_to_x_LEFT -= character_speed
+            elif event.key == pygame.K_RIGHT: # the character to right
+                character_to_x_RIGHT += character_speed
+            elif event.key == pygame.K_SPACE: # the character using weapon
+                weapon_x_pos = character_x_pos + (character_width / 2) - (weapon_width / 2)
+                weapon_y_pos = character_y_pos
+                weapons.append([weapon_x_pos, weapon_y_pos])
+
+        if event.type == pygame.KEYUP:
+            if event.key == pygame.K_LEFT:
+                character_to_x_LEFT = 0
+            if event.key == pygame.K_RIGHT:
+                character_to_x_RIGHT = 0
+        
+    character_x_pos += character_to_x_LEFT + character_to_x_RIGHT
+
+    # 3. Definition of the game character's the position
+    character_x_pos += character_to_x
+    
+    if character_x_pos < 0:
+        character_x_pos = 0
+    elif character_x_pos > screen_width - character_width:
+        character_x_pos = screen_width - character_width
+
+    # Weapon position
+    weapons = [[w[0], w[1] - weapon_speed] for w in weapons]
+
+    # Weapon disappearing when it touches the edge
+    weapons = [[w[0], w[1]] for w in weapons if w[1] > 0]
+
+    # Definition of the position of balls
+    for ball_idx, ball_val in enumerate(balls):
+        ball_pos_x = ball_val["pos_x"]
+        ball_pos_y = ball_val["pos_y"]
+        ball_img_idx =ball_val["img_idx"]
+
+        ball_size = ball_images[ball_img_idx].get_rect().size
+        ball_width = ball_size[0]
+        ball_height = ball_size[1]
+
+        if ball_pos_x < 0 or ball_pos_x > screen_width - ball_width:
+            ball_val["to_x"] = ball_val["to_x"] * -1
+
+        if ball_pos_y >= screen_height - stage_height - ball_height:
+            ball_val["to_y"] = ball_val["init_spd_y"]
+        else:
+            ball_val["to_y"] += 0.4
+
+        ball_val["pos_x"] += ball_val["to_x"]
+        ball_val["pos_y"] += ball_val["to_y"]
+
+    # 4. Collision processing
+
+    # Character rect info update
+    character_rect = character.get_rect()
+    character_rect.left = character_x_pos
+    character_rect.top = character_y_pos
+
+    for ball_idx, ball_val in enumerate(balls):
+        ball_pos_x = ball_val["pos_x"]
+        ball_pos_y = ball_val["pos_y"]
+        ball_img_idx =ball_val["img_idx"]
+
+        # Balls rect info update
+        ball_rect = ball_images[ball_img_idx].get_rect()
+        ball_rect.left = ball_pos_x
+        ball_rect.top = ball_pos_y
+
+        # Collision between balls and the character processing
+        if character_rect.colliderect(ball_rect):
+            running = False
+            break
+
+        # Coliision between balls and weapons processing
+        for weapon_idx, weapon_val in enumerate(weapons):
+            weapon_pos_x = weapon_val[0]
+            weapon_pos_y = weapon_val[1]
+
+            # Weapons rect info update
+            weapon_rect = weapon.get_rect()
+            weapon_rect.left = weapon_pos_x
+            weapon_rect.top = weapon_pos_y
+
+            # Collision check
+            if weapon_rect.colliderect(ball_rect):
+                weapon_to_remove = weapon_idx
+                ball_to_remove = ball_idx
+
+                # if the ball is not the smallest one, divide it to 2 next smaller balls
+                if ball_img_idx < 3:
+
+                    ball_width = ball_rect.size[0]
+                    ball_height = ball_rect.size[1]
+
+                    small_ball_rect = ball_images[ball_img_idx + 1].get_rect()
+                    small_ball_width = small_ball_rect.size[0]
+                    small_ball_height = small_ball_rect.size[1]
+
+                    # Smaller ball to the left
+                    balls.append({
+                        "pos_x" : ball_pos_x + (ball_width / 2) - (small_ball_width / 2),
+                        "pos_y" : ball_pos_y + (ball_height / 2) - (small_ball_height / 2),
+                        "img_idx" : ball_img_idx + 1,
+                        "to_x" : -3, # if it's -3, then to the left, and if it's 3, then to the right
+                        "to_y" : -5,
+                        "init_spd_y" : ball_speed_y[ball_img_idx + 1]})
+                    
+                    # Smaller ball to the right
+                    balls.append({
+                        "pos_x" : ball_pos_x + (ball_width / 2) - (small_ball_width / 2),
+                        "pos_y" : ball_pos_y + (ball_height / 2) - (small_ball_height / 2),
+                        "img_idx" : ball_img_idx + 1,
+                        "to_x" : 3, # if it's -3, then to the left, and if it's 3, then to the right
+                        "to_y" : -5,
+                        "init_spd_y" : ball_speed_y[ball_img_idx + 1]})
+                break
+        else:
+            continue
+        break
+    
+    if ball_to_remove > -1:
+        del balls[ball_to_remove]
+        ball_to_remove = -1
+    
+    if weapon_to_remove > -1:
+        del weapons[weapon_to_remove]
+        weapon_to_remove = -1
+
+    # if there is no more balls, game complete
+    if len(balls) == 0:
+        game_result = "YOU WIN!"
+        running = False
+
+    # 5. Drawing on the screen
+    screen.blit(background, (0, 0))
+
+    for weapon_x_pos, weapon_y_pos in weapons:
+        screen.blit(weapon, (weapon_x_pos, weapon_y_pos))
+
+    for idx, val in enumerate(balls):
+        ball_pos_x = val["pos_x"]
+        ball_pos_y = val["pos_y"]
+        ball_img_idx = val["img_idx"]
+        screen.blit(ball_images[ball_img_idx], (ball_pos_x, ball_pos_y))
+
+    screen.blit(stage, (0, screen_height -stage_height))
+    screen.blit(character, (character_x_pos, character_y_pos))
+
+    # Time counter
+    elapsed_time = (pygame.time.get_ticks() - start_ticks) / 1000 # ms to s
+    timer = game_font.render("Time : {}".format(int(total_time - elapsed_time)), True, (255, 255, 255))
+    screen.blit(timer, (10, 10))
+
+    # if time is out
+    if total_time - elapsed_time <= 0:
+        game_result = "Time Over"
+        running = False
+    
+    key_explain = game_font.render("ARROW KEYS = move, SPACE = weapon", True, (255, 255, 255))
+    key_explain_size = key_explain.get_rect().size
+    screen.blit(key_explain, ((screen_width - key_explain_size[0]) / 2, (screen_height - stage_height + (stage_height - key_explain_size[1]) / 2)))
+
+    pygame.display.update()
+
+# Game over message rendering
+msg = game_font.render(game_result, True, (255, 255, 0))
+msg_rect = msg.get_rect(center=(int(screen_width / 2), int(screen_height / 2)))
+screen.blit(msg, msg_rect)
+pygame.display.update()
+
+pygame.time.delay(2000)
+
+pygame.quit()
